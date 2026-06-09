@@ -1,0 +1,56 @@
+version: "3.9"
+
+# ── Antigravity Speech AI — Docker Compose ────────────────────────────────────
+#
+# Quick start:
+#   1. cp backend/.env.example backend/.env   and fill in GROQ_API_KEY
+#   2. cp frontend/.env.example frontend/.env.local
+#   3. docker compose up --build
+#
+# The app will be available at http://localhost:3000
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: antigravity-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override ALLOWED_ORIGINS to allow the frontend container to connect
+      ALLOWED_ORIGINS: "http://localhost:3000,http://frontend:3000"
+    volumes:
+      # Persist uploaded PDFs and ChromaDB index across restarts
+      - backend_data:/app/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Backend URL used by Next.js rewrites (server-side proxy, not in browser)
+        BACKEND_URL: "http://backend:8000"
+        # WebSocket URL used directly by the browser — must be reachable from the client
+        NEXT_PUBLIC_WS_BASE: "ws://localhost:8000"
+    image: antigravity-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: "http://backend:8000"
+
+volumes:
+  backend_data:
