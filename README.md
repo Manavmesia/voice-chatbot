@@ -56,77 +56,57 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## Production — Render Deployment
-
-The project ships with a `render.yaml` Blueprint that defines both services. This is the fastest way to deploy.
-
-### Step 1 — Push to GitHub
+## Production — Docker Compose
 
 ```bash
-cd /path/to/Voice-ChatBot\(AI\)
-git init
-git add .
-git commit -m "Initial commit"
-# Create a repo on github.com, then:
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -u origin main
+cp backend/.env.example backend/.env
+# Edit backend/.env and set GROQ_API_KEY
+
+docker compose up --build
 ```
 
-> The `.gitignore` is already configured — `backend/.env`, `backend/data/`, `node_modules/`, and `.next/` are all excluded.
-
-### Step 2 — Create a Render Blueprint
-
-1. Go to [dashboard.render.com](https://dashboard.render.com) → **New** → **Blueprint**
-2. Connect your GitHub repo
-3. Render detects `render.yaml` automatically and shows two services: `antigravity-backend` and `antigravity-frontend`
-4. Click **Apply**
-
-### Step 3 — Set Secret Environment Variables
-
-Render will pause and ask you to fill in variables marked `sync: false`:
-
-| Service | Variable | Value |
-|---|---|---|
-| `antigravity-backend` | `GROQ_API_KEY` | Your Groq API key from [console.groq.com](https://console.groq.com) |
-| `antigravity-backend` | `ALLOWED_ORIGINS` | Set this after Step 4 (see below) |
-
-For now set `ALLOWED_ORIGINS` to `*` temporarily so the frontend can connect during the first deploy. You will lock it down in Step 5.
-
-### Step 4 — Note Your URLs
-
-After both services deploy, Render assigns public URLs:
-- Backend: `https://antigravity-backend.onrender.com` (or similar)
-- Frontend: `https://antigravity-frontend.onrender.com`
-
-### Step 5 — Lock Down CORS
-
-Go to the **backend service** → Environment → update `ALLOWED_ORIGINS`:
-```
-https://antigravity-frontend.onrender.com
-```
-Click **Save Changes** — Render redeploys automatically.
-
-### Step 6 — Verify
-
-Open `https://antigravity-frontend.onrender.com`. Upload a PDF, start a conversation, and confirm voice works.
+App runs at [http://localhost:3000](http://localhost:3000).
+PDF data and ChromaDB index persist in the `backend_data` Docker volume.
 
 ---
 
-### Important Render Notes
+## Production — Custom Deployment
 
-**Free tier (Starter plan) spins down after 15 minutes of inactivity.** The first request after spin-down takes ~30 seconds. Upgrade to the **Standard plan** ($7/mo per service) for always-on behaviour.
+### Backend (any Python host)
 
-**Data persistence:** The `render.yaml` mounts a 1 GB disk at `/app/data` on the backend. Your uploaded PDFs and ChromaDB index survive across redeploys. Without the disk, everything resets on each deploy.
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+```
 
-**WebSockets:** Render supports WebSocket connections natively — no extra configuration needed.
+> Use `--workers 1`. The in-memory session state is not shared across multiple worker processes.
 
-**Workers:** The backend runs with `--workers 1`. Do not increase this — session state is in-memory and not shared across processes.
+Required environment variables:
 
-**URL format:** Render uses `https://` for web traffic and your WebSocket connections must use `wss://` (already configured in `render.yaml`).
+| Variable | Description |
+|---|---|
+| `GROQ_API_KEY` | Your Groq API key |
+| `ALLOWED_ORIGINS` | Comma-separated frontend URLs (e.g. `https://app.yourdomain.com`) |
+| `DATA_DIR` | Path to the persistent data directory |
+| `GROQ_MODEL` | (optional) Groq model name, default `llama-3.3-70b-versatile` |
+| `TTS_VOICE` | (optional) Edge TTS voice name |
+| `TTS_RATE` | (optional) TTS speaking rate, e.g. `-10%` |
+| `MAX_UPLOAD_MB` | (optional) Max PDF upload size in MB, default `50` |
+
+### Frontend (Vercel / any Node host)
+
+```bash
+npm run build
+npm start
+```
+
+Required environment variables:
+
+| Variable | Description |
+|---|---|
+| `BACKEND_URL` | Backend URL for server-side proxy rewrites (e.g. `https://api.yourdomain.com`) |
+| `NEXT_PUBLIC_WS_BASE` | WebSocket URL used by the browser (e.g. `wss://api.yourdomain.com`) |
 
 ---
-
-
 
 ## Configuration Reference
 
