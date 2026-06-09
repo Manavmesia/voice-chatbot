@@ -1,4 +1,4 @@
-# STS AI ChatBot
+# Speech-To-Speech AI ChatBot
 
 Real-time, full-duplex Speech-to-Speech AI Voice Assistant grounded strictly in your uploaded PDF documents. Supports multilingual input/output, barge-in interruption, and streaming TTS.
 
