@@ -1,0 +1,55 @@
+# render.yaml — Render Blueprint
+# Defines both services so you can deploy the entire stack with one click.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ── Backend: FastAPI ──────────────────────────────────────────────────────────
+  - name: antigravity-backend
+    type: web
+    runtime: docker
+    # Render builds from the Dockerfile inside the backend/ directory
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter           # free tier — upgrade to "standard" for always-on
+    region: oregon          # change to: frankfurt, singapore, ohio, virginia
+    healthCheckPath: /health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false         # Render will prompt you to enter this secret manually
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: TTS_VOICE
+        value: en-US-EmmaMultilingualNeural
+      - key: TTS_RATE
+        value: "-10%"
+      - key: DATA_DIR
+        value: /app/data
+      - key: MAX_UPLOAD_MB
+        value: "50"
+      # Set this after the frontend is deployed — use your actual Vercel/Render URL.
+      # Example: https://antigravity-frontend.onrender.com
+      - key: ALLOWED_ORIGINS
+        sync: false         # Enter manually after you know the frontend URL
+    disk:
+      name: pdf-data
+      mountPath: /app/data
+      sizeGB: 1             # Persists ChromaDB index and uploaded PDFs across deploys
+
+  # ── Frontend: Next.js ─────────────────────────────────────────────────────────
+  - name: antigravity-frontend
+    type: web
+    runtime: node
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    plan: starter
+    region: oregon
+    envVars:
+      # Server-side: used by Next.js rewrites to proxy /api/* to the backend.
+      # Replace with your actual backend Render URL after the backend deploys.
+      - key: BACKEND_URL
+        value: https://antigravity-backend.onrender.com
+      # Client-side: used by the browser to open WebSocket connections.
+      # Must use wss:// because Render serves over HTTPS.
+      - key: NEXT_PUBLIC_WS_BASE
+        value: wss://antigravity-backend.onrender.com
